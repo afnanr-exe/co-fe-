@@ -83,4 +83,6 @@ Signing requires `android/key.properties` — see `android/key.properties` for t
 
 ## License
 
-Personal project — not open for redistribution without permission.
+[Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)](LICENSE)
+
+Free to use, modify, and share — just don't sell it or make money from it. Credit appreciated.
