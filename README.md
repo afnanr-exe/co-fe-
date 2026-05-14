@@ -1,6 +1,6 @@
 # co:fe
 
-A vocabulary learning app built for people who actually want the words to stick.
+A vocabulary learning app built for people who actually want to review coffee with an incredible word count.
 No flashcard grind. No streaks for show. Just a word a day, a puzzle to test it, and a quiz that only unlocks when you've earned it.
 
 Built by **Afnan Rahman** — [afnan061502@gmail.com](mailto:afnan061502@gmail.com)
@@ -64,22 +64,6 @@ Optional daily reminder at 8:00 AM. Toggle it on or off in Settings — off by d
 
 ---
 
-## Building
-
-```bash
-# Debug
-flutter run
-
-# Play Store
-flutter build appbundle --release
-
-# GitHub APK (split by architecture)
-flutter build apk --release --split-per-abi
-```
-
-Signing requires `android/key.properties` — see `android/key.properties` for the expected format (not committed to version control).
-
----
 
 ## License
 
