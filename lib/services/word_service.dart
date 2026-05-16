@@ -67,6 +67,11 @@ class WordService {
     _cachedWords = null;
   }
 
+  static Future<bool> hasCustomWords() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.containsKey(_keyCustomWords);
+  }
+
   static Future<void> resetWords() async {
     final prefs =
         await SharedPreferences.getInstance();

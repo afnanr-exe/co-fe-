@@ -289,6 +289,14 @@ class SettingsService {
   }
 
   // =========================
+  // REVERT TO ORIGINAL
+  // =========================
+
+  static Future<void> revertToOriginalWords() async {
+    await WordService.resetWords();
+  }
+
+  // =========================
   // EXPORT
   // =========================
 

@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/dictionary_service.dart';
 import '../services/notification_service.dart';
 import '../services/settings_service.dart';
+import '../services/word_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -20,6 +21,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   String _importStatus = '';
   int _remainingChanges = 3;
   bool _notificationsEnabled = false;
+  bool _hasCustomWords = false;
 
   // MW key state: null = unchecked, true = valid, false = invalid
   bool? _mwKeyValid;
@@ -48,6 +50,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     _loadRemaining();
     _loadNotifPref();
     _loadMWKey();
+    _loadCustomWordsFlag();
   }
 
   Future<void> _loadNotifPref() async {
@@ -98,6 +101,12 @@ class _SettingsScreenState extends State<SettingsScreen>
     super.dispose();
   }
 
+  Future<void> _loadCustomWordsFlag() async {
+    final has = await WordService.hasCustomWords();
+    if (!mounted) return;
+    setState(() => _hasCustomWords = has);
+  }
+
   Future<void> _loadRemaining() async {
     final remaining = await SettingsService.remainingChangesToday();
 
@@ -142,6 +151,44 @@ class _SettingsScreenState extends State<SettingsScreen>
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg)),
+    );
+  }
+
+  Future<void> _revertWords() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: const Text(
+          'Revert to original list?',
+          style: TextStyle(color: Colors.white, fontSize: 18),
+        ),
+        content: const Text(
+          'This will replace your current word list with the original 365 words. Your stats and progress are not affected.',
+          style: TextStyle(color: Colors.grey, fontSize: 14, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Revert', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    await SettingsService.revertToOriginalWords();
+    if (!mounted) return;
+
+    setState(() => _hasCustomWords = false);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Reverted to original word list')),
     );
   }
 
@@ -389,9 +436,21 @@ class _SettingsScreenState extends State<SettingsScreen>
                 // ================= WORD LIST =================
                 _section(
                   title: 'Word List',
-                  child: _button(
-                    text: 'Export Current Words',
-                    onTap: _exportWords,
+                  child: Column(
+                    children: [
+                      _button(
+                        text: 'Export Current Words',
+                        onTap: _exportWords,
+                      ),
+                      if (_hasCustomWords) ...[
+                        const SizedBox(height: 10),
+                        _button(
+                          text: 'Revert to Original Word List',
+                          onTap: _revertWords,
+                          color: Colors.red,
+                        ),
+                      ],
+                    ],
                   ),
                 ),
 
