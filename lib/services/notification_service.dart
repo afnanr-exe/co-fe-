@@ -67,7 +67,9 @@ class NotificationService {
   }
 
   static Future<void> scheduleDailyReminder() async {
-    await _plugin.cancel(_notifId);
+    try {
+      await _plugin.cancel(_notifId);
+    } catch (_) {}
 
     final now = tz.TZDateTime.now(tz.local);
     var scheduled = tz.TZDateTime(
@@ -91,25 +93,27 @@ class NotificationService {
       wordTerm = words[index].term;
     } catch (_) {}
 
-    await _plugin.zonedSchedule(
-      _notifId,
-      'co:fe ☕',
-      'today\'s word: $wordTerm',
-      scheduled,
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          _channelId,
-          _channelName,
-          icon: '@mipmap/ic_launcher',
-          importance: Importance.defaultImportance,
-          priority: Priority.defaultPriority,
+    try {
+      await _plugin.zonedSchedule(
+        _notifId,
+        'co:fe ☕',
+        'today\'s word: $wordTerm',
+        scheduled,
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            _channelId,
+            _channelName,
+            icon: '@mipmap/ic_launcher',
+            importance: Importance.defaultImportance,
+            priority: Priority.defaultPriority,
+          ),
         ),
-      ),
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.time,
-    );
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time,
+      );
+    } catch (_) {}
   }
 
   static Future<void> cancel() async {

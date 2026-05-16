@@ -52,25 +52,23 @@ class _StatsScreenState extends State<StatsScreen> {
     _loadStats();
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _loadStats();
-  }
-
   Future<void> _loadStats() async {
-    final stats = await StatsService.getStats();
-    final quizReady = await QuizService.isQuizReady();
-    final inCooldown = await QuizService.isInCooldown();
-    final lastQuiz = await QuizService.getLastQuizResult();
-    final mistakesNeeded = await QuizService.mistakesUntilQuiz();
-    setState(() {
-      _stats = stats;
-      _quizReady = quizReady;
-      _inCooldown = inCooldown;
-      _lastQuizResult = lastQuiz;
-      _mistakesUntilQuiz = mistakesNeeded;
-    });
+    try {
+      final stats = await StatsService.getStats();
+      final quizReady = await QuizService.isQuizReady();
+      final inCooldown = await QuizService.isInCooldown();
+      final lastQuiz = await QuizService.getLastQuizResult();
+      final mistakesNeeded = await QuizService.mistakesUntilQuiz();
+      if (mounted) {
+        setState(() {
+          _stats = stats;
+          _quizReady = quizReady;
+          _inCooldown = inCooldown;
+          _lastQuizResult = lastQuiz;
+          _mistakesUntilQuiz = mistakesNeeded;
+        });
+      }
+    } catch (_) {}
   }
 
   int get _totalPlayed =>
@@ -842,5 +840,9 @@ class _RingPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_RingPainter oldDelegate) => true;
+  bool shouldRepaint(_RingPainter oldDelegate) =>
+      oldDelegate.correct != correct ||
+      oldDelegate.assisted != assisted ||
+      oldDelegate.wrong != wrong ||
+      oldDelegate.total != total;
 }

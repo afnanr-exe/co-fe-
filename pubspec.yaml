@@ -2,7 +2,7 @@ name: vocabapp
 description: "co:fee vocab app by afnan rahman"
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 1.0.4+4
 
 environment:
   sdk: ^3.11.5

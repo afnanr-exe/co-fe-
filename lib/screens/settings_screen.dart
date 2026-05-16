@@ -61,7 +61,9 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   Future<void> _toggleNotifications(bool value) async {
     setState(() => _notificationsEnabled = value);
-    await NotificationService.setEnabled(value);
+    try {
+      await NotificationService.setEnabled(value);
+    } catch (_) {}
   }
 
   Future<void> _loadMWKey() async {
@@ -76,21 +78,30 @@ class _SettingsScreenState extends State<SettingsScreen>
   Future<void> _saveMWKey() async {
     final key = _mwKeyController.text.trim();
     if (key.isEmpty) {
-      await SettingsService.setMWApiKey('');
+      try {
+        await SettingsService.setMWApiKey('');
+      } catch (_) {}
       if (!mounted) return;
       setState(() => _mwKeyValid = null);
       return;
     }
 
     setState(() => _verifyingKey = true);
-    final valid = await DictionaryService.verifyMWKey(key);
-    if (!mounted) return;
-
-    if (valid) await SettingsService.setMWApiKey(key);
-    setState(() {
-      _mwKeyValid = valid;
-      _verifyingKey = false;
-    });
+    try {
+      final valid = await DictionaryService.verifyMWKey(key);
+      if (!mounted) return;
+      if (valid) await SettingsService.setMWApiKey(key);
+      setState(() {
+        _mwKeyValid = valid;
+        _verifyingKey = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _mwKeyValid = false;
+        _verifyingKey = false;
+      });
+    }
   }
 
   @override

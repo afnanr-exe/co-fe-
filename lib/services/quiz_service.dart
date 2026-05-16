@@ -283,50 +283,90 @@ class QuizService {
   static Future<void> _checkAndSaveMonthlyScore(
       SharedPreferences prefs) async {
     final resultsRaw = prefs.getStringList(_keyQuizResults) ?? [];
-
-    if (resultsRaw.length < 4) return;
+    if (resultsRaw.isEmpty) return;
 
     final results =
         resultsRaw.map((r) => QuizResult.fromMap(jsonDecode(r))).toList();
+    final currentMonth = DateTime.now().toIso8601String().substring(0, 7);
 
-    // Only archive if all results share the same month
-    final firstMonth = results.first.date.substring(0, 7);
-    final allSameMonth = results.every(
-      (r) => r.date.substring(0, 7) == firstMonth,
-    );
-    if (!allSameMonth) return;
+    // Separate results from past months vs current month
+    final pastResults =
+        results.where((r) => r.date.substring(0, 7) != currentMonth).toList();
+    final currentResults =
+        results.where((r) => r.date.substring(0, 7) == currentMonth).toList();
 
-    final monthYear = firstMonth;
+    // Archive past months (regardless of count) and current month if 4+ quizzes
+    final shouldArchivePast = pastResults.isNotEmpty;
+    final shouldArchiveCurrent = currentResults.length >= 4;
+    if (!shouldArchivePast && !shouldArchiveCurrent) return;
 
     final monthlyRaw = prefs.getStringList(_keyMonthlyScores) ?? [];
 
-    final exists = monthlyRaw.any((m) {
-      final map = jsonDecode(m);
-      return map['monthYear'] == monthYear;
-    });
+    // Group past results by month and archive each
+    if (shouldArchivePast) {
+      final byMonth = <String, List<QuizResult>>{};
+      for (final r in pastResults) {
+        byMonth.putIfAbsent(r.date.substring(0, 7), () => []).add(r);
+      }
+      for (final entry in byMonth.entries) {
+        final alreadyExists = monthlyRaw
+            .any((m) => (jsonDecode(m) as Map)['monthYear'] == entry.key);
+        if (alreadyExists) continue;
+        final group = entry.value;
+        final monthly = MonthlyScore(
+          monthYear: entry.key,
+          avgPerformance: group
+                  .map((r) => r.performanceScore)
+                  .reduce((a, b) => a + b) /
+              group.length,
+          avgHabit:
+              group.map((r) => r.habitScore).reduce((a, b) => a + b) /
+                  group.length,
+          avgFinal:
+              group.map((r) => r.finalScore).reduce((a, b) => a + b) /
+                  group.length,
+          totalWordsReviewed:
+              group.map((r) => r.totalWords).reduce((a, b) => a + b),
+          quizzesTaken: group.length,
+        );
+        monthlyRaw.add(jsonEncode(monthly.toMap()));
+      }
+    }
 
-    if (exists) return;
-
-    final monthly = MonthlyScore(
-      monthYear: monthYear,
-      avgPerformance:
-          results.map((r) => r.performanceScore).reduce((a, b) => a + b) /
-              results.length,
-      avgHabit:
-          results.map((r) => r.habitScore).reduce((a, b) => a + b) /
-              results.length,
-      avgFinal:
-          results.map((r) => r.finalScore).reduce((a, b) => a + b) /
-              results.length,
-      totalWordsReviewed:
-          results.map((r) => r.totalWords).reduce((a, b) => a + b),
-      quizzesTaken: results.length,
-    );
-
-    monthlyRaw.add(jsonEncode(monthly.toMap()));
+    // Archive current month if it hit the 4-quiz threshold
+    if (shouldArchiveCurrent) {
+      final alreadyExists = monthlyRaw
+          .any((m) => (jsonDecode(m) as Map)['monthYear'] == currentMonth);
+      if (!alreadyExists) {
+        final monthly = MonthlyScore(
+          monthYear: currentMonth,
+          avgPerformance: currentResults
+                  .map((r) => r.performanceScore)
+                  .reduce((a, b) => a + b) /
+              currentResults.length,
+          avgHabit: currentResults
+                  .map((r) => r.habitScore)
+                  .reduce((a, b) => a + b) /
+              currentResults.length,
+          avgFinal: currentResults
+                  .map((r) => r.finalScore)
+                  .reduce((a, b) => a + b) /
+              currentResults.length,
+          totalWordsReviewed: currentResults
+              .map((r) => r.totalWords)
+              .reduce((a, b) => a + b),
+          quizzesTaken: currentResults.length,
+        );
+        monthlyRaw.add(jsonEncode(monthly.toMap()));
+      }
+    }
 
     await prefs.setStringList(_keyMonthlyScores, monthlyRaw);
-    await prefs.setStringList(_keyQuizResults, []);
+
+    // Keep only current-month results that weren't archived
+    final toKeep = shouldArchiveCurrent ? <QuizResult>[] : currentResults;
+    await prefs.setStringList(
+        _keyQuizResults, toKeep.map((r) => jsonEncode(r.toMap())).toList());
 
     await _checkAndSaveYearlyScore(prefs);
   }

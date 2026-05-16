@@ -49,17 +49,20 @@ class _PuzzleScreenState extends State<PuzzleScreen>
 
   Future<void> _init() async {
     _loadedDate = DateTime.now().toIso8601String().substring(0, 10);
-    final words = await WordService.getWords();
-    final completed =
-        await StatsService.isPuzzleCompletedToday();
+    try {
+      final words = await WordService.getWords();
+      final completed = await StatsService.isPuzzleCompletedToday();
 
-    setState(() {
-      _allWords = words;
-      _completedToday = completed;
-      _loading = false;
-    });
+      setState(() {
+        _allWords = words;
+        _completedToday = completed;
+        _loading = false;
+      });
 
-    _loadWord();
+      _loadWord();
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   void _loadWord() {

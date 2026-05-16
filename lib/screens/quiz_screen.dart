@@ -38,38 +38,42 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   Future<void> _buildQuiz() async {
-    final allWords = await WordService.getWords();
-    final allTerms = allWords.map((w) => w.term).toSet();
+    try {
+      final allWords = await WordService.getWords();
+      final allTerms = allWords.map((w) => w.term).toSet();
 
-    // Remove missed words that no longer exist in the current word list
-    final validMissed = widget.missedWords
-        .where((term) => allTerms.contains(term))
-        .toList();
+      // Remove missed words that no longer exist in the current word list
+      final validMissed = widget.missedWords
+          .where((term) => allTerms.contains(term))
+          .toList();
 
-    if (validMissed.length != widget.missedWords.length) {
-      final prefs =
-          await SharedPreferences.getInstance();
-      await prefs.setStringList(
-          'stat_missed_words', validMissed);
+      if (validMissed.length != widget.missedWords.length) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setStringList('stat_missed_words', validMissed);
+      }
+
+      final matched = allWords
+          .where((w) => validMissed.contains(w.term))
+          .toList();
+
+      final choices = matched.map((word) {
+        final options = [
+          word.definition,
+          ...word.distractors,
+        ]..shuffle();
+        return options;
+      }).toList();
+
+      if (mounted) {
+        setState(() {
+          _quizWords = matched;
+          _choices = choices;
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
     }
-
-    final matched = allWords
-        .where((w) => validMissed.contains(w.term))
-        .toList();
-
-    final choices = matched.map((word) {
-      final options = [
-        word.definition,
-        ...word.distractors,
-      ]..shuffle();
-      return options;
-    }).toList();
-
-    setState(() {
-      _quizWords = matched;
-      _choices = choices;
-      _loading = false;
-    });
   }
 
   Word get _currentWord => _quizWords[_currentIndex];
@@ -128,20 +132,23 @@ class _QuizScreenState extends State<QuizScreen> {
                 .reduce((a, b) => a + b) /
             _quizWords.length;
 
-    final result = await QuizService.saveQuizResult(
-      masteredWords: _mastered,
-      missedWords: _stillMissed,
-      avgDifficulty: avgDifficulty,
-    );
+    try {
+      final result = await QuizService.saveQuizResult(
+        masteredWords: _mastered,
+        missedWords: _stillMissed,
+        avgDifficulty: avgDifficulty,
+      );
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    Navigator.pushReplacement(
-      context,
-      _slideRoute(
-        QuizResultScreen(result: result),
-      ),
-    );
+      Navigator.pushReplacement(
+        context,
+        _slideRoute(QuizResultScreen(result: result)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    }
   }
 
   void _goBackToStats() {

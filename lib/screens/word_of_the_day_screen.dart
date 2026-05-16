@@ -42,26 +42,30 @@ class _WordOfTheDayScreenState
 
   Future<void> _loadWord() async {
     _loadedDate = DateTime.now().toIso8601String().substring(0, 10);
-    final words = await WordService.getWords();
+    try {
+      final words = await WordService.getWords();
 
-    if (words.isEmpty) {
-      setState(() => _loading = false);
-      return;
+      if (words.isEmpty) {
+        setState(() => _loading = false);
+        return;
+      }
+
+      final today = DateTime.now();
+      // offset +14 so today's WotD matches the puzzle word 14 days from now
+      final index = (today.dayOfYear + 14) % words.length;
+      final word = words[index];
+
+      setState(() {
+        _word = word;
+        _loading = false;
+      });
+
+      try {
+        await _pushWidgetData(word);
+      } catch (_) {}
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
     }
-
-    final today = DateTime.now();
-    // offset +14 so today's WotD matches the puzzle word 14 days from now
-    final index =
-        (today.dayOfYear + 14) % words.length;
-
-    final word = words[index];
-
-    setState(() {
-      _word = word;
-      _loading = false;
-    });
-
-    await _pushWidgetData(word);
   }
 
   Future<void> _pushWidgetData(Word word) async {
