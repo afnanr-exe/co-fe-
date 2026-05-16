@@ -11,6 +11,8 @@ class StatsService {
   static const _keyLastPlayed = 'stat_last_played';
   static const _keyMissedWords = 'stat_missed_words';
   static const _keyWeeklyActivity = 'stat_weekly_activity';
+  // separate key so resets can't re-unlock today's puzzle
+  static const _keyPuzzlePlayedDate = 'stat_puzzle_played_date';
 
   // =========================
   // SAVE RESULT
@@ -67,6 +69,9 @@ class StatsService {
       _keyWeeklyActivity,
       activity.entries.map((e) => '${e.key}:${e.value}').toList(),
     );
+
+    // mark puzzle as played today (not cleared by reset)
+    await prefs.setString(_keyPuzzlePlayedDate, today);
 
     // =========================
     // STREAK LOGIC (UNCHANGED BUT SAFE)
@@ -130,7 +135,7 @@ class StatsService {
   static Future<bool> isPuzzleCompletedToday() async {
     final prefs = await SharedPreferences.getInstance();
     final today = DateTime.now().toIso8601String().substring(0, 10);
-    return (prefs.getString(_keyLastPlayed) ?? '') == today;
+    return (prefs.getString(_keyPuzzlePlayedDate) ?? '') == today;
   }
 
   static Future<void> clearMissedWords() async {

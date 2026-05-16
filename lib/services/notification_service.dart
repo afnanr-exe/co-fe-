@@ -3,6 +3,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_10y.dart' as tz_data;
+import '../utils/date_utils.dart';
+import 'word_service.dart';
 
 class NotificationService {
   static final _plugin = FlutterLocalNotificationsPlugin();
@@ -80,10 +82,19 @@ class NotificationService {
       scheduled = scheduled.add(const Duration(days: 1));
     }
 
+    // compute the word for the notification's fire date (best-effort)
+    String wordTerm = 'your word';
+    try {
+      final words = await WordService.getWords();
+      final notifDate = DateTime(scheduled.year, scheduled.month, scheduled.day);
+      final index = (notifDate.dayOfYear + 14) % words.length;
+      wordTerm = words[index].term;
+    } catch (_) {}
+
     await _plugin.zonedSchedule(
       _notifId,
-      'co:fe — word of the day',
-      'your daily word is waiting ☕',
+      'co:fe ☕',
+      'today\'s word: $wordTerm',
       scheduled,
       NotificationDetails(
         android: AndroidNotificationDetails(
@@ -103,24 +114,6 @@ class NotificationService {
 
   static Future<void> cancel() async {
     await _plugin.cancel(_notifId);
-  }
-
-  // For debug: show an immediate test notification
-  static Future<void> showTestNotification() async {
-    await _plugin.show(
-      99,
-      'co:fe — test notification',
-      'notifications are working ✅',
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          _channelId,
-          _channelName,
-          icon: '@mipmap/ic_launcher',
-          importance: Importance.high,
-          priority: Priority.high,
-        ),
-      ),
-    );
   }
 
   static Future<void> setTimeZone(String timeZoneName) async {

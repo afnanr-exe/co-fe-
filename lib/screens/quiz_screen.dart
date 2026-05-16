@@ -55,7 +55,6 @@ class _QuizScreenState extends State<QuizScreen> {
 
     final matched = allWords
         .where((w) => validMissed.contains(w.term))
-        .take(1)
         .toList();
 
     final choices = matched.map((word) {
@@ -107,6 +106,7 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   void _nextWord() {
+    if (!mounted) return;
     if (_currentIndex + 1 >= _quizWords.length) {
       _finishQuiz();
       return;

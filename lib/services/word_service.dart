@@ -147,21 +147,6 @@ class WordService {
     return words[random.nextInt(words.length)];
   }
 
-  static Future<Word> getWordOfTheDay() async {
-    final words = await getWords();
-
-    final now = DateTime.now();
-
-    final seed =
-        now.year * 1000 +
-        now.month * 100 +
-        now.day;
-
-    final index = seed % words.length;
-
-    return words[index];
-  }
-
   static Future<List<Word>>
       getWordsByDifficulty(int tier) async {
     final words = await getWords();

@@ -1,5 +1,6 @@
 package com.afnan.cofe
 
+import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
@@ -34,6 +35,15 @@ class WordWidget : AppWidgetProvider() {
             views.setTextViewText(R.id.widget_term, term)
             views.setTextViewText(R.id.widget_pos, pos)
             views.setTextViewText(R.id.widget_definition, definition)
+
+            val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+            if (launchIntent != null) {
+                val pendingIntent = PendingIntent.getActivity(
+                    context, 0, launchIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                views.setOnClickPendingIntent(R.id.widget_container, pendingIntent)
+            }
 
             appWidgetManager.updateAppWidget(appWidgetId, views)
         }

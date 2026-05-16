@@ -50,3 +50,6 @@ keystore/
 
 # Claude Code memory
 .claude/
+
+# Demo build entrypoint (local only)
+lib/main_demo.dart

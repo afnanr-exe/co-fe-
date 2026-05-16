@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../services/dictionary_service.dart';
 import '../services/notification_service.dart';
 import '../services/settings_service.dart';
 
@@ -12,10 +14,17 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen>
     with SingleTickerProviderStateMixin {
   final TextEditingController _controller = TextEditingController();
+  final TextEditingController _mwKeyController = TextEditingController();
 
   bool _loading = false;
+  String _importStatus = '';
   int _remainingChanges = 3;
   bool _notificationsEnabled = false;
+
+  // MW key state: null = unchecked, true = valid, false = invalid
+  bool? _mwKeyValid;
+  bool _mwKeyObscured = true;
+  bool _verifyingKey = false;
 
   late final AnimationController _fadeController;
   late final Animation<double> _fade;
@@ -38,6 +47,7 @@ class _SettingsScreenState extends State<SettingsScreen>
 
     _loadRemaining();
     _loadNotifPref();
+    _loadMWKey();
   }
 
   Future<void> _loadNotifPref() async {
@@ -47,14 +57,43 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   Future<void> _toggleNotifications(bool value) async {
-    await NotificationService.setEnabled(value);
-    if (!mounted) return;
     setState(() => _notificationsEnabled = value);
+    await NotificationService.setEnabled(value);
+  }
+
+  Future<void> _loadMWKey() async {
+    final key = await SettingsService.getMWApiKey();
+    if (!mounted) return;
+    if (key != null) {
+      _mwKeyController.text = key;
+      setState(() => _mwKeyValid = true);
+    }
+  }
+
+  Future<void> _saveMWKey() async {
+    final key = _mwKeyController.text.trim();
+    if (key.isEmpty) {
+      await SettingsService.setMWApiKey('');
+      if (!mounted) return;
+      setState(() => _mwKeyValid = null);
+      return;
+    }
+
+    setState(() => _verifyingKey = true);
+    final valid = await DictionaryService.verifyMWKey(key);
+    if (!mounted) return;
+
+    if (valid) await SettingsService.setMWApiKey(key);
+    setState(() {
+      _mwKeyValid = valid;
+      _verifyingKey = false;
+    });
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _mwKeyController.dispose();
     _fadeController.dispose();
     super.dispose();
   }
@@ -72,28 +111,37 @@ class _SettingsScreenState extends State<SettingsScreen>
   Future<void> _importWords() async {
     if (_controller.text.trim().isEmpty) return;
 
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _importStatus = 'looking up definitions...';
+    });
 
     final result = await SettingsService.importCustomWords(
       _controller.text,
+      onProgress: (done, total) {
+        if (!mounted) return;
+        setState(() => _importStatus = 'enriching $done / $total words...');
+      },
     );
 
     if (!mounted) return;
 
-    setState(() => _loading = false);
+    setState(() {
+      _loading = false;
+      _importStatus = '';
+    });
 
     await _loadRemaining();
-
     if (!mounted) return;
 
+    final enriched = (result['enriched'] as int?) ?? 0;
+    final msg = result['success'] == true
+        ? 'imported ${result['imported']} words'
+            '${enriched > 0 ? ' ($enriched enriched with definitions)' : ''}'
+        : result['message'] as String;
+
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          result['success']
-              ? 'Imported ${result['imported']} words'
-              : result['message'],
-        ),
-      ),
+      SnackBar(content: Text(msg)),
     );
   }
 
@@ -325,7 +373,11 @@ class _SettingsScreenState extends State<SettingsScreen>
                       const SizedBox(height: 14),
 
                       _button(
-                        text: _loading ? 'importing...' : 'Import Words',
+                        text: _loading
+                            ? (_importStatus.isNotEmpty
+                                ? _importStatus
+                                : 'importing...')
+                            : 'Import Words',
                         onTap: _importWords,
                       ),
                     ],
@@ -340,6 +392,167 @@ class _SettingsScreenState extends State<SettingsScreen>
                   child: _button(
                     text: 'Export Current Words',
                     onTap: _exportWords,
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // ================= DICTIONARY API =================
+                _section(
+                  title: 'Dictionary API',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Imported words are automatically enriched using the free dictionary. Add a Merriam-Webster key for higher quality definitions and etymology.',
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontSize: 12,
+                          height: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      GestureDetector(
+                        onTap: () => launchUrl(
+                          Uri.parse('https://dictionaryapi.com'),
+                          mode: LaunchMode.externalApplication,
+                        ),
+                        child: const Text(
+                          'get a free key at dictionaryapi.com',
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 11,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: _mwKeyController,
+                        obscureText: _mwKeyObscured,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          letterSpacing: 0.5,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'paste Merriam-Webster API key',
+                          hintStyle: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 13,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderSide:
+                                BorderSide(color: Colors.grey.shade800),
+                          ),
+                          focusedBorder: const OutlineInputBorder(
+                            borderSide: BorderSide(color: Colors.white),
+                          ),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _mwKeyObscured
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                              color: Colors.grey,
+                              size: 18,
+                            ),
+                            onPressed: () => setState(
+                                () => _mwKeyObscured = !_mwKeyObscured),
+                          ),
+                        ),
+                        onChanged: (_) => setState(() => _mwKeyValid = null),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: _verifyingKey ? null : _saveMWKey,
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 150),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: _mwKeyValid == true
+                                        ? Colors.green.shade700
+                                        : _mwKeyValid == false
+                                            ? Colors.red.shade700
+                                            : Colors.grey.shade800,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: _verifyingKey
+                                      ? const SizedBox(
+                                          width: 14,
+                                          height: 14,
+                                          child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 1.5,
+                                          ),
+                                        )
+                                      : Text(
+                                          _mwKeyValid == true
+                                              ? 'key saved ✓'
+                                              : _mwKeyValid == false
+                                                  ? 'invalid key'
+                                                  : 'save & verify',
+                                          style: TextStyle(
+                                            color: _mwKeyValid == true
+                                                ? Colors.green.shade400
+                                                : _mwKeyValid == false
+                                                    ? Colors.red.shade400
+                                                    : Colors.white,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (_mwKeyValid == true) ...[
+                            const SizedBox(width: 10),
+                            GestureDetector(
+                              onTap: () async {
+                                _mwKeyController.clear();
+                                await SettingsService.setMWApiKey('');
+                                if (!mounted) return;
+                                setState(() => _mwKeyValid = null);
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 12, horizontal: 16),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                      color: Colors.grey.shade800),
+                                ),
+                                child: const Text(
+                                  'remove',
+                                  style: TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      if (_mwKeyValid == null && _mwKeyController.text.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            'using free dictionary — works without a key',
+                            style: TextStyle(
+                              color: Colors.grey.shade700,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
 

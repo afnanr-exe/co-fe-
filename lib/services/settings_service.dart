@@ -2,17 +2,34 @@ import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/word.dart';
+import 'dictionary_service.dart';
 import 'quiz_service.dart';
 import 'stats_service.dart';
 import 'word_service.dart';
 
 class SettingsService {
   static const _keyAppStartDate = 'app_start_date';
+  static const _keyMwApiKey = 'mw_api_key';
 
   static const _keyCustomChangesToday = 'custom_changes_today';
   static const _keyCustomChangeDate = 'custom_change_date';
 
   static const _maxChangesPerDay = 3;
+
+  // =========================
+  // MW API KEY
+  // =========================
+
+  static Future<String?> getMWApiKey() async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = prefs.getString(_keyMwApiKey) ?? '';
+    return key.isNotEmpty ? key : null;
+  }
+
+  static Future<void> setMWApiKey(String key) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyMwApiKey, key.trim());
+  }
 
   // =========================
   // APP DATE SYSTEM
@@ -184,101 +201,90 @@ class SettingsService {
   // =========================
 
   static Future<Map<String, dynamic>> importCustomWords(
-    String input,
-  ) async {
-    final allowed =
-        await canChangeWordList();
-
+    String input, {
+    void Function(int done, int total)? onProgress,
+  }) async {
+    final allowed = await canChangeWordList();
     if (!allowed) {
       return {
         'success': false,
-        'message':
-            'Daily limit reached (3 changes/day).',
+        'message': 'Daily limit reached (3 changes/day).',
       };
     }
 
     final parsed = parseWords(input);
-
     if (parsed.isEmpty) {
-      return {
-        'success': false,
-        'message': 'No valid words found.',
-      };
+      return {'success': false, 'message': 'No valid words found.'};
     }
-
     if (parsed.length > 365) {
-      return {
-        'success': false,
-        'message': 'Max 365 words allowed.',
-      };
+      return {'success': false, 'message': 'Max 365 words allowed.'};
     }
 
-    final existing =
-        await WordService.getWords();
+    final mwKey = await getMWApiKey();
 
-    final updated =
-        List<Word>.from(existing);
+    // Fetch definitions for all words in parallel batches
+    final lookups = await DictionaryService.lookupBatch(
+      parsed,
+      mwKey: mwKey,
+      onProgress: onProgress,
+    );
 
+    final existing = await WordService.getWords();
+    final updated = List<Word>.from(existing);
     final rand = Random();
 
-    for (final word in parsed) {
+    for (int i = 0; i < parsed.length; i++) {
+      final term = parsed[i];
+      final data = lookups[i];
+
       final newWord = Word(
-        term: word,
-        definition:
-            'Custom definition pending API integration.',
-        exampleSentence:
-            'Example sentence for $word.',
+        term: term,
+        definition: data?['definition']?.isNotEmpty == true
+            ? data!['definition']!
+            : 'No definition available.',
+        exampleSentence: data?['exampleSentence']?.isNotEmpty == true
+            ? data!['exampleSentence']!
+            : 'No example sentence available.',
         difficultyTier: 2,
         language: 'en',
-        etymology: 'Imported word',
-        partOfSpeech: 'noun',
-        pronunciation: word,
-        distractors: const [
-          'option 1',
-          'option 2',
-          'option 3',
-        ],
+        etymology: data?['etymology']?.isNotEmpty == true
+            ? data!['etymology']!
+            : 'No etymology available.',
+        partOfSpeech: data?['partOfSpeech'] ?? 'unknown',
+        pronunciation: data?['pronunciation']?.isNotEmpty == true
+            ? data!['pronunciation']!
+            : term,
+        distractors: const [],
       );
 
-      // prevent empty list crash
       if (updated.isNotEmpty) {
-        final index =
-            rand.nextInt(updated.length);
-
-        updated[index] = newWord;
+        updated[rand.nextInt(updated.length)] = newWord;
       } else {
         updated.add(newWord);
       }
     }
 
     await WordService.saveCustomWords(
-      updated
-          .map(
-            (w) => {
-              'term': w.term,
-              'definition': w.definition,
-              'exampleSentence':
-                  w.exampleSentence,
-              'difficultyTier':
-                  w.difficultyTier,
-              'language': w.language,
-              'etymology': w.etymology,
-              'partOfSpeech':
-                  w.partOfSpeech,
-              'pronunciation':
-                  w.pronunciation,
-            },
-          )
-          .toList(),
+      updated.map((w) => {
+        'term': w.term,
+        'definition': w.definition,
+        'exampleSentence': w.exampleSentence,
+        'difficultyTier': w.difficultyTier,
+        'language': w.language,
+        'etymology': w.etymology,
+        'partOfSpeech': w.partOfSpeech,
+        'pronunciation': w.pronunciation,
+      }).toList(),
     );
 
     await _incrementChanges();
 
+    final enriched = lookups.where((r) => r != null).length;
     return {
       'success': true,
       'imported': parsed.length,
-      'remaining':
-          await remainingChangesToday(),
+      'enriched': enriched,
+      'remaining': await remainingChangesToday(),
     };
   }
 

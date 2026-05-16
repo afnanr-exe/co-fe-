@@ -13,17 +13,35 @@ class WordOfTheDayScreen extends StatefulWidget {
 }
 
 class _WordOfTheDayScreenState
-    extends State<WordOfTheDayScreen> {
+    extends State<WordOfTheDayScreen>
+    with WidgetsBindingObserver {
   Word? _word;
   bool _loading = true;
+  String _loadedDate = '';
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadWord();
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      final today = DateTime.now().toIso8601String().substring(0, 10);
+      if (today != _loadedDate) _loadWord();
+    }
+  }
+
   Future<void> _loadWord() async {
+    _loadedDate = DateTime.now().toIso8601String().substring(0, 10);
     final words = await WordService.getWords();
 
     if (words.isEmpty) {

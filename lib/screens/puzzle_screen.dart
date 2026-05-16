@@ -11,7 +11,8 @@ class PuzzleScreen extends StatefulWidget {
   State<PuzzleScreen> createState() => _PuzzleScreenState();
 }
 
-class _PuzzleScreenState extends State<PuzzleScreen> {
+class _PuzzleScreenState extends State<PuzzleScreen>
+    with WidgetsBindingObserver {
   List<Word> _allWords = [];
 
   late Word currentWord;
@@ -23,14 +24,31 @@ class _PuzzleScreenState extends State<PuzzleScreen> {
   bool hintRevealed = false;
   bool _loading = true;
   bool _completedToday = false;
+  String _loadedDate = '';
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _init();
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      final today = DateTime.now().toIso8601String().substring(0, 10);
+      if (today != _loadedDate) _init();
+    }
+  }
+
   Future<void> _init() async {
+    _loadedDate = DateTime.now().toIso8601String().substring(0, 10);
     final words = await WordService.getWords();
     final completed =
         await StatsService.isPuzzleCompletedToday();
