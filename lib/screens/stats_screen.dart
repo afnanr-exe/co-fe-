@@ -52,12 +52,6 @@ class _StatsScreenState extends State<StatsScreen> {
     _loadStats();
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _loadStats();
-  }
-
   Future<void> _loadStats() async {
     final stats = await StatsService.getStats();
     final quizReady = await QuizService.isQuizReady();
@@ -842,5 +836,9 @@ class _RingPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_RingPainter oldDelegate) => true;
+  bool shouldRepaint(_RingPainter oldDelegate) =>
+      oldDelegate.correct != correct ||
+      oldDelegate.assisted != assisted ||
+      oldDelegate.wrong != wrong ||
+      oldDelegate.total != total;
 }

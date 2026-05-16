@@ -9,14 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/word.dart';
 
 class WordService {
-  static const _keyCustomWords =
-      'custom_words';
-
-  static const _keyImportCount =
-      'daily_import_count';
-
-  static const _keyImportDate =
-      'daily_import_date';
+  static const _keyCustomWords = 'custom_words';
 
   static List<Word>? _cachedWords;
 
@@ -79,69 +72,6 @@ class WordService {
     await prefs.remove(_keyCustomWords);
 
     _cachedWords = null;
-  }
-
-  static Future<bool> canImportWords() async {
-    final prefs =
-        await SharedPreferences.getInstance();
-
-    final today =
-        DateTime.now().toIso8601String().substring(0, 10);
-
-    final savedDate =
-        prefs.getString(_keyImportDate);
-
-    if (savedDate != today) {
-      await prefs.setString(
-        _keyImportDate,
-        today,
-      );
-
-      await prefs.setInt(
-        _keyImportCount,
-        0,
-      );
-
-      return true;
-    }
-
-    final count =
-        prefs.getInt(_keyImportCount) ?? 0;
-
-    return count < 3;
-  }
-
-  static Future<void> incrementImportCount() async {
-    final prefs =
-        await SharedPreferences.getInstance();
-
-    final count =
-        prefs.getInt(_keyImportCount) ?? 0;
-
-    await prefs.setInt(
-      _keyImportCount,
-      count + 1,
-    );
-  }
-
-  static Future<int> remainingImports() async {
-    final prefs =
-        await SharedPreferences.getInstance();
-
-    final today =
-        DateTime.now().toIso8601String().substring(0, 10);
-
-    final savedDate =
-        prefs.getString(_keyImportDate);
-
-    if (savedDate != today) {
-      return 3;
-    }
-
-    final count =
-        prefs.getInt(_keyImportCount) ?? 0;
-
-    return 3 - count;
   }
 
   static Future<Word> getRandomWord() async {

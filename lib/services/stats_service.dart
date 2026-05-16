@@ -65,6 +65,13 @@ class StatsService {
 
     activity[today] = outcome;
 
+    // trim entries older than 30 days
+    final cutoff = DateTime.now()
+        .subtract(const Duration(days: 30))
+        .toIso8601String()
+        .substring(0, 10);
+    activity.removeWhere((key, _) => key.compareTo(cutoff) < 0);
+
     await prefs.setStringList(
       _keyWeeklyActivity,
       activity.entries.map((e) => '${e.key}:${e.value}').toList(),
@@ -77,7 +84,8 @@ class StatsService {
     // STREAK LOGIC (UNCHANGED BUT SAFE)
     // =========================
     if (lastPlayed != today) {
-      final yesterday = DateTime.now()
+      final now = DateTime.now();
+      final yesterday = DateTime(now.year, now.month, now.day)
           .subtract(const Duration(days: 1))
           .toIso8601String()
           .substring(0, 10);
