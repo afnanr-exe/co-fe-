@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../models/word.dart';
 import '../services/stats_service.dart';
@@ -25,18 +27,31 @@ class _PuzzleScreenState extends State<PuzzleScreen>
   bool _loading = true;
   bool _completedToday = false;
   String _loadedDate = '';
+  Timer? _midnightTimer;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _init();
+    _scheduleMidnightRefresh();
   }
 
   @override
   void dispose() {
+    _midnightTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  void _scheduleMidnightRefresh() {
+    final now = DateTime.now();
+    final tomorrow = DateTime(now.year, now.month, now.day + 1);
+    final untilMidnight = tomorrow.difference(now);
+    _midnightTimer = Timer(untilMidnight, () {
+      _init();
+      _scheduleMidnightRefresh();
+    });
   }
 
   @override
@@ -53,6 +68,7 @@ class _PuzzleScreenState extends State<PuzzleScreen>
       final words = await WordService.getWords();
       final completed = await StatsService.isPuzzleCompletedToday();
 
+      if (!mounted) return;
       setState(() {
         _allWords = words;
         _completedToday = completed;

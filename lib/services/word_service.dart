@@ -4,9 +4,11 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/services.dart';
+import 'package:home_widget/home_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/word.dart';
+import '../utils/date_utils.dart';
 
 class WordService {
   static const _keyCustomWords = 'custom_words';
@@ -72,6 +74,20 @@ class WordService {
     await prefs.remove(_keyCustomWords);
 
     _cachedWords = null;
+  }
+
+  static Future<void> updateDailyWidget() async {
+    try {
+      final words = await getWords();
+      if (words.isEmpty) return;
+      final today = DateTime.now();
+      final index = (today.dayOfYear + 14) % words.length;
+      final word = words[index];
+      await HomeWidget.saveWidgetData('widget_word_term', word.term);
+      await HomeWidget.saveWidgetData('widget_word_pos', word.partOfSpeech);
+      await HomeWidget.saveWidgetData('widget_word_definition', word.definition);
+      await HomeWidget.updateWidget(androidName: 'WordWidget');
+    } catch (_) {}
   }
 
   static Future<Word> getRandomWord() async {

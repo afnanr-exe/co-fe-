@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'screens/puzzle_screen.dart';
@@ -6,12 +8,14 @@ import 'screens/splash_screen.dart';
 import 'screens/stats_screen.dart';
 import 'screens/word_of_the_day_screen.dart';
 import 'services/notification_service.dart';
+import 'services/word_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await NotificationService.init();
   } catch (_) {}
+  unawaited(WordService.updateDailyWidget());
   runApp(const VocabApp());
 }
 

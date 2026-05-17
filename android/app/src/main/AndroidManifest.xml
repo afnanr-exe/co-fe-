@@ -48,6 +48,8 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+                <action android:name="android.intent.action.DATE_CHANGED"/>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"

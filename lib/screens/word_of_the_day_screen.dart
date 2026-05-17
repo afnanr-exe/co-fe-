@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:home_widget/home_widget.dart';
 import '../models/word.dart';
@@ -18,18 +20,31 @@ class _WordOfTheDayScreenState
   Word? _word;
   bool _loading = true;
   String _loadedDate = '';
+  Timer? _midnightTimer;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadWord();
+    _scheduleMidnightRefresh();
   }
 
   @override
   void dispose() {
+    _midnightTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  void _scheduleMidnightRefresh() {
+    final now = DateTime.now();
+    final tomorrow = DateTime(now.year, now.month, now.day + 1);
+    final untilMidnight = tomorrow.difference(now);
+    _midnightTimer = Timer(untilMidnight, () {
+      _loadWord();
+      _scheduleMidnightRefresh();
+    });
   }
 
   @override
@@ -46,7 +61,7 @@ class _WordOfTheDayScreenState
       final words = await WordService.getWords();
 
       if (words.isEmpty) {
-        setState(() => _loading = false);
+        if (mounted) setState(() => _loading = false);
         return;
       }
 
@@ -55,7 +70,7 @@ class _WordOfTheDayScreenState
       final index = (today.dayOfYear + 14) % words.length;
       final word = words[index];
 
-      setState(() {
+      if (mounted) setState(() {
         _word = word;
         _loading = false;
       });
